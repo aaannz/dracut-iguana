@@ -1,7 +1,7 @@
 #
 # spec file for package dracut-iguana
 #
-# Copyright (c) 2022 SUSE LLC.
+# Copyright (c) 2022 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -15,17 +15,18 @@
 # Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
 
+
 Name:           dracut-iguana
 Version:        0.1
-BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-Source:         iguana-%{version}.tar
+Release:        0
 Summary:        Container based dracut module
-License:        GPL-2.0
+License:        GPL-2.0-only
 Group:          System/Packages
-BuildArch:      noarch
+Source:         iguana-%{version}.tar
 BuildRequires:  dracut
 Requires:       dracut
 Requires:       podman
+BuildArch:      noarch
 
 %description
 Dracut module adding container boot workflow
@@ -36,12 +37,11 @@ Dracut module adding container boot workflow
 %build
 
 %install
-mkdir -p %{buildroot}/usr/lib/dracut/modules.d/50iguana
-cp -R iguana/* %{buildroot}/usr/lib/dracut/modules.d/50iguana
-chmod 755 %{buildroot}/usr/lib/dracut/modules.d/50iguana/*
+mkdir -p %{buildroot}%{_prefix}/lib/dracut/modules.d/50iguana
+cp -R iguana/* %{buildroot}%{_prefix}/lib/dracut/modules.d/50iguana
+chmod 755 %{buildroot}%{_prefix}/lib/dracut/modules.d/50iguana/*
 
 %files
-%defattr(-,root,root,-)
-/usr/lib/dracut/modules.d/50iguana
+%{_prefix}/lib/dracut/modules.d/50iguana
 
 %changelog
