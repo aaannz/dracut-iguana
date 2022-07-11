@@ -1,0 +1,18 @@
+main_workflow:
+  steps:
+    - branch_package:
+        source_project: home:oholecek
+        source_package: dracut-iguana
+        target_project: home:oholecek:PRs
+  filters:
+    event: pull_request
+rebuild_master:
+  steps:
+    - rebuild_package:
+        project: home:oholecek
+        package: dracut-iguana
+  filters:
+    event: push
+    branches:
+      only:
+        - main
