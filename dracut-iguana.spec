@@ -20,9 +20,10 @@ Name:           dracut-iguana
 Version:        0.1
 Release:        0
 Summary:        Container based dracut module
+URL:            https://github.com/aaannz/dracut-iguana
 License:        GPL-2.0-only
 Group:          System/Packages
-Source:         iguana-%{version}.tar
+Source:         %{name}-%{version}.tar
 BuildRequires:  dracut
 Requires:       dracut
 Requires:       podman
@@ -32,7 +33,7 @@ BuildArch:      noarch
 Dracut module adding container boot workflow
 
 %prep
-%setup -q -n iguana-%{version}
+%setup -q
 
 %build
 
