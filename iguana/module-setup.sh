@@ -7,7 +7,7 @@ check() {
 
 # called by dracut
 depends() {
-    echo network dm
+    echo network
     return 0
 }
 
@@ -27,6 +27,7 @@ install() {
     inst_hook pre-mount 99 "$moddir/iguana.sh"
     inst_hook initqueue/timeout 99 "$moddir/iguana-timeout.sh"
 
+    #TODO: make network requirement optional
     echo "rd.neednet=1 rd.auto" > "${initdir}/etc/cmdline.d/50iguana.conf"
 
     # wicked duid generation rules - use ll instead of default llt. ll does not include time, just mac address and generic prefix
