@@ -40,6 +40,15 @@ udevadm settle -t 60
 # from now on, disable automatic RAID assembly
 udevproperty rd_NO_MD=1
 
+# config podman
+
+mkdir -p /etc/containers/
+cat << 'EOF' > /etc/containers/containers.conf
+# We are running in initramfs and cannot pivout out
+[engine]
+no_pivot_root = true
+EOF
+
 # what we need:
 # - registry (hardcode registry.suse.com?, take from control file? opensuse will want registry.opensuse.org. Others would want different
 # - image name
