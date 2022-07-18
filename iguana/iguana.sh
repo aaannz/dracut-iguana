@@ -108,10 +108,6 @@ if [ -n $MACHINE_ID]; then
   echo $MACHINE_ID > $NEWROOT/etc/machine-id
 fi
 
-# and wicked leases, prevents double IP assignement
-mkdir -p $NEWROOT/var/lib/wicked
-cp /var/lib/wicked/lease* $NEWROOT/var/lib/wicked/
-
 # in case installed system has different kernel then the one in initrd
 if [ -n "$kernelAction" ] ; then
   umount -a
