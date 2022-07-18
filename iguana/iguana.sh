@@ -53,7 +53,7 @@ if [ -f control.yaml ]; then
 fi
 
 # load containers as specified in command line
-if [ -n "$CONTAINERS"]; then
+if [ -n "$CONTAINERS" ]; then
   Echo "Using container list from kcmdline: ${CONTAINERS}"
   readarray -d , -t container_array <<< "$CONTAINERS"
 
@@ -63,7 +63,8 @@ if [ -n "$CONTAINERS"]; then
   for c in "${container_array}"; do
     Echo "Before container run:\n$(free -m)"
     # pull image
-    podman image pull -- $c > /progress
+    #TODO: remove tls-verify-false and instead pull correct CA
+    podman image pull --tls-verify=false -- $c > /progress
 
     #TODO: image validation, cosign
 
@@ -71,19 +72,27 @@ if [ -n "$CONTAINERS"]; then
     #TODO: load result volume based on the info from control.yaml
     #TODO: concurrent run of multiple container - podman-compose?
     podman run \
-    --priviledged --rm --tty --interactive \
+    --privileged --rm --tty --interactive --network=host \
     --annotation="iguana=True" --env="iguana=True" \
     --env-host --mount=type=volume,source=results,destination=/iguana \
     -- $c
 
+    echo "podman run \
+    --privileged --rm --tty --interactive --network=host \
+    --annotation=\"iguana=True\" --env=\"iguana=True\" \
+    --env-host --mount=type=volume,source=results,destination=/iguana \
+    -- $c" > run_container.sh
+
     Echo "After container run:\n$(free -m)"
-    podman image rm -- $c
+
+    #TODO uncomment adfter debug
+    #podman image rm -- $c
     Echo "After image:\nrm $(free -m)"
   done
 fi
 
 Echo "Containers run finished, iguana ends"
-sleep 100
+sleep 10
 
 # persist generated machineid
 if [ -n $MACHINE_ID]; then
