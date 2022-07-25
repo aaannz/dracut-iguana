@@ -27,6 +27,7 @@ Source:         %{name}-%{version}.tar
 BuildRequires:  dracut
 Requires:       dracut
 Requires:       podman
+Requires:       kexec-tools
 BuildArch:      noarch
 
 %description

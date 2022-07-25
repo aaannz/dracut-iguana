@@ -1,6 +1,12 @@
 #!/bin/bash
 
-NEWROOT=${NEWROOT:-/mnt}
+[ -n "$IGUANA_DEBUG" ] && set -x
+
+if [ -z "$root" ] || [ "$root"x != "iguanabootx" ]; then
+  exit 0
+fi
+
+NEWROOT=${NEWROOT:-/sysroot}
 export NEWROOT
 
 # Open reporting fifo
@@ -29,8 +35,9 @@ Echo "Preparing Iguana boot environment"
 
 # Clear preexisting machine id if present
 rm -f /etc/machine-id
-mkdir -p /var/lib/dbus
+rm -f /etc/hostname
 rm -f /var/lib/dbus/machine-id
+mkdir -p /var/lib/dbus
 dbus-uuidgen --ensure
 systemd-machine-id-setup
 
@@ -41,9 +48,8 @@ udevadm settle -t 60
 udevproperty rd_NO_MD=1
 
 # config podman
-
-mkdir -p /etc/containers/
-cat << 'EOF' > /etc/containers/containers.conf
+mkdir -p /etc/containers/containers.conf.d
+cat << 'EOF' > /etc/containers/containers.conf.d/no_pivot_root.conf
 # We are running in initramfs and cannot pivout out
 [engine]
 no_pivot_root = true
@@ -62,15 +68,15 @@ if [ -f control.yaml ]; then
 fi
 
 # load containers as specified in command line
-if [ -n "$CONTAINERS" ]; then
-  Echo "Using container list from kcmdline: ${CONTAINERS}"
-  readarray -d , -t container_array <<< "$CONTAINERS"
+if [ -n "$IGUANA_CONTAINERS" ]; then
+  Echo "Using container list from kcmdline: ${IGUANA_CONTAINERS}"
+  readarray -d , -t container_array <<< "$IGUANA_CONTAINERS"
 
-  podman volume exists results || \
-    podman volume create --opt device=tmpfs --opt type=tmpfs --opt o=nodev,noexec results
+  # Directories for container data sharing and results
+  mkdir -p /iguana
+  mkdir -p $NEWROOT
 
   for c in "${container_array}"; do
-    Echo "Before container run:\n$(free -m)"
     # pull image
     #TODO: remove tls-verify-false and instead pull correct CA
     podman image pull --tls-verify=false -- $c > /progress
@@ -82,46 +88,39 @@ if [ -n "$CONTAINERS" ]; then
     #TODO: concurrent run of multiple container - podman-compose?
     podman run \
     --privileged --rm --tty --interactive --network=host \
-    --annotation="iguana=True" --env="iguana=True" \
-    --env-host --mount=type=volume,source=results,destination=/iguana \
+    --annotation=iguana=True --env=iguana=True --env=NEWROOT=${NEWROOT} \
+    --volume="/dev:/dev" \
+    --mount=type=bind,source=/iguana,target=/iguana \
     -- $c
 
-    echo "podman run \
-    --privileged --rm --tty --interactive --network=host \
-    --annotation=\"iguana=True\" --env=\"iguana=True\" \
-    --env-host --mount=type=volume,source=results,destination=/iguana \
-    -- $c" > run_container.sh
-
-    Echo "After container run:\n$(free -m)"
-
-    #TODO uncomment adfter debug
-    #podman image rm -- $c
-    Echo "After image:\nrm $(free -m)"
+    [ -z "$IGUANA_DEBUG" ] && podman image rm -- $c
   done
 fi
 
-Echo "Containers run finished, iguana ends"
-sleep 10
+Echo "Containers run finished"
 
-# persist generated machineid
-if [ -n $MACHINE_ID]; then
-  echo $MACHINE_ID > $NEWROOT/etc/machine-id
+# Mount new roots for upcoming switch_root
+if [ -f /iguana/newroot_device ]; then
+  cat /iguana/newroot_device | while read device mountpoint; do
+    mount "$device" "$mountpoint"
+  done
 fi
 
-# in case installed system has different kernel then the one in initrd
-if [ -n "$kernelAction" ] ; then
+# TODO: add proper kernel action parsing
+# TODO: this is really naive
+# Scan $NEWROOT for installed kernel, initrd and command line
+# in case installed system has different kernel then the one we are running we need to kexec to new one
+CUR_KERNEL=$(uname -r)
+NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
+if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
+  # different kernel detected - try kexec to new one
+  kexec -l "${NEWROOT}/boot/vmlinuz" --initrd="${NEWROOT}/boot/initrd" --reuse-cmdline
   umount -a
   sync
-  if [ "$kernelAction" = "reboot" ] ; then
-    Echo "Reboot with correct kernel version in 10s"
-    sleep 10
-    reboot -f
-  elif [ "$kernelAction" = "kexec" ] ; then
-    kexec -e
-    Echo "Kexec failed, reboot with correct kernel version in 10s"
-    sleep 10
-    reboot -f
-  fi
+  kexec -e
+  Echo "Kexec failed, rebooting with correct kernel version in 10s"
+  sleep 10
+  reboot -f
 fi
 
 [ -n "$PROGRESS_PID" ] && kill $PROGRESS_PID
