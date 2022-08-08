@@ -20,14 +20,20 @@ Name:           dracut-iguana
 Version:        0.1
 Release:        0
 Summary:        Container based dracut module
-URL:            https://github.com/aaannz/dracut-iguana
 License:        GPL-2.0-only
 Group:          System/Packages
+URL:            https://github.com/aaannz/dracut-iguana
 Source:         %{name}-%{version}.tar
 BuildRequires:  dracut
+Requires:       curl
 Requires:       dracut
-Requires:       podman
+Requires:       grep
+Requires:       iguana-workflow
+Requires:       iproute2
 Requires:       kexec-tools
+Requires:       podman
+Requires:       procps
+Requires:       wicked
 BuildArch:      noarch
 
 %description
