@@ -55,6 +55,20 @@ cat << 'EOF' > /etc/containers/containers.conf.d/no_pivot_root.conf
 no_pivot_root = true
 EOF
 
+# TODO: add local image stores for when using DVD/ISO.
+# ensure we are using overlay driver, SLE was forcing btrfs
+cat << 'EOF' >/etc/containers/storage.conf
+[storage]
+driver = "overlay"
+runroot = "/var/run/containers/storage"
+graphroot = "/var/lib/containers/storage"
+
+[storage.options]
+additionalimagestores = []
+
+size = ""
+EOF
+
 # what we need:
 # - registry (hardcode registry.suse.com?, take from control file? opensuse will want registry.opensuse.org. Others would want different
 # - image name
@@ -62,20 +76,27 @@ EOF
 #   - bind mounts, volumes, priviledged, ports published
 # - directory with results
 
-if [ -f control.yaml ]; then
-   #TODO
-   sleep 1
+# Directories for container data sharing and results
+mkdir -p /iguana
+mkdir -p $NEWROOT
+
+IGUANA_BUILDIN_CONTROL="/etc/iguana/control.yaml"
+IGUANA_CMDLINE_EXTRA="--newroot=${NEWROOT} ${IGUANA_DEBUG:+--debug --log-level=debug}"
+
+if [ -n $IGUANA_CONTROL_URL ]; then
+  curl --insecure -o control_url.yaml -L -- "$IGUANA_CONTROL_URL"
+  if [ $? -ne 0 ]; then
+    Echo "Failed to download provided control file, ignoring"
+  fi
 fi
 
-# load containers as specified in command line
-if [ -n "$IGUANA_CONTAINERS" ]; then
+if [ -f control_url.yaml ]; then
+  /usb/bin/iguana-workflow $IGUANA_CMDLINE_EXTRA control_url.yaml
+elif [ -n "$IGUANA_CONTAINERS" ]; then
   Echo "Using container list from kcmdline: ${IGUANA_CONTAINERS}"
   readarray -d , -t container_array <<< "$IGUANA_CONTAINERS"
 
-  # Directories for container data sharing and results
-  mkdir -p /iguana
-  mkdir -p $NEWROOT
-
+  # once iguana-workflow is stable, replace this by workflow writer and workflow run
   for c in "${container_array}"; do
     # pull image
     #TODO: remove tls-verify-false and instead pull correct CA
@@ -95,6 +116,9 @@ if [ -n "$IGUANA_CONTAINERS" ]; then
 
     [ -z "$IGUANA_DEBUG" ] && podman image rm -- $c
   done
+# control.yaml is buildin control file in initrd
+elif [ -f "$IGUANA_BUILDIN_CONTROL" ]; then
+  /usb/bin/iguana-workflow $IGUANA_CMDLINE_EXTRA "$IGUANA_BUILDIN_CONTROL"
 fi
 
 Echo "Containers run finished"
@@ -110,17 +134,21 @@ fi
 # TODO: this is really naive
 # Scan $NEWROOT for installed kernel, initrd and command line
 # in case installed system has different kernel then the one we are running we need to kexec to new one
-CUR_KERNEL=$(uname -r)
-NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
-if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
-  # different kernel detected - try kexec to new one
-  kexec -l "${NEWROOT}/boot/vmlinuz" --initrd="${NEWROOT}/boot/initrd" --reuse-cmdline
-  umount -a
-  sync
-  kexec -e
-  Echo "Kexec failed, rebooting with correct kernel version in 10s"
-  sleep 10
-  reboot -f
+if mount | grep -q ${NEWROOT}; then
+  CUR_KERNEL=$(uname -r)
+  NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
+  if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
+    # different kernel detected - try kexec to new one
+    kexec -l "${NEWROOT}/boot/vmlinuz" --initrd="${NEWROOT}/boot/initrd" --reuse-cmdline
+    umount -a
+    sync
+    kexec -e
+    Echo "Kexec failed, rebooting with correct kernel version in 10s"
+    sleep 10
+    reboot -f
+  fi
+else
+  Echo "[WARN] New root not mounted!"
 fi
 
 [ -n "$PROGRESS_PID" ] && kill $PROGRESS_PID
