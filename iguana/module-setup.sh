@@ -40,7 +40,7 @@ install() {
     inst_multiple -o $(container_reqs)
 
     inst_multiple grep ldconfig date dbus-uuidgen systemd-machine-id-setup dmidecode seq \
-                  lsblk curl head sync tail kexec
+                  curl head sync tail kexec iguana-workflow
 
     #TODO
     #install SUSE CA as a trust anchor
