@@ -6,28 +6,39 @@ if [ -z "$root" ] || [ "$root"x != "iguanabootx" ]; then
   exit 0
 fi
 
+IGUANA_WORKFLOW="/usr/bin/iguana-workflow"
+
+if [ ! -x $IGUANA_WORKFLOW ]; then
+  echo "Missing Iguana workflow binary!"
+  exit 1
+fi
+
 NEWROOT=${NEWROOT:-/sysroot}
 export NEWROOT
 
+# Directories for container data sharing and results
+mkdir -p /iguana
+mkdir -p $NEWROOT
+
 # Open reporting fifo
 if [ -e /usr/bin/plymouth ] ; then
-    mkfifo /progress
-    bash -c 'while true ; do read msg < /progress ; plymouth message --text="$msg" ; done ' &
+    mkfifo /iguana/progress
+    bash -c 'while true ; do read msg < /iguana/progress ; plymouth message --text="$msg" ; done' &
     PROGRESS_PID=$!
 else
-    mkfifo /progress
-    bash -c 'while true ; do read msg < /progress ; echo -n -e "\033[2K$msg\015" >/dev/console ; done ' &
+    mkfifo /iguana/progress
+    bash -c 'while true ; do read msg < /iguana/progress ; echo -n -e "\033[2K$msg\015" > /dev/console ; done' &
     PROGRESS_PID=$!
 fi
 
-echo -n > /dc_progress
-bash -c 'tail -f /dc_progress | while true ; do read msg ; echo "$msg" >/progress ; done ' &
+echo -n > /iguana/dc_progress
+bash -c 'tail -f /iguana/dc_progress | while true ; do read msg ; echo "$msg" > /iguana/progress ; done' &
 DC_PROGRESS_PID=$!
 
 if ! declare -f Echo > /dev/null ; then
   Echo() {
     echo -e "$@"
-    echo -e "$@" > /progress
+    echo -e "$@" > /iguana/progress
   }
 fi
 
@@ -76,10 +87,6 @@ EOF
 #   - bind mounts, volumes, priviledged, ports published
 # - directory with results
 
-# Directories for container data sharing and results
-mkdir -p /iguana
-mkdir -p $NEWROOT
-
 IGUANA_BUILDIN_CONTROL="/etc/iguana/control.yaml"
 IGUANA_CMDLINE_EXTRA="--newroot=${NEWROOT} ${IGUANA_DEBUG:+--debug --log-level=debug}"
 
@@ -87,26 +94,23 @@ if [ -n $IGUANA_CONTROL_URL ]; then
   curl --insecure -o control_url.yaml -L -- "$IGUANA_CONTROL_URL"
   if [ $? -ne 0 ]; then
     Echo "Failed to download provided control file, ignoring"
+    sleep 5
   fi
 fi
 
 if [ -f control_url.yaml ]; then
-  /usb/bin/iguana-workflow $IGUANA_CMDLINE_EXTRA control_url.yaml
+  $IGUANA_WORKFLOW $IGUANA_CMDLINE_EXTRA control_url.yaml
 elif [ -n "$IGUANA_CONTAINERS" ]; then
   Echo "Using container list from kcmdline: ${IGUANA_CONTAINERS}"
   readarray -d , -t container_array <<< "$IGUANA_CONTAINERS"
 
   # once iguana-workflow is stable, replace this by workflow writer and workflow run
   for c in "${container_array}"; do
-    # pull image
     #TODO: remove tls-verify-false and instead pull correct CA
-    podman image pull --tls-verify=false -- $c > /progress
+    podman image pull --tls-verify=false -- $c > /iguana/progress
 
     #TODO: image validation, cosign
-
-    # run container
     #TODO: load result volume based on the info from control.yaml
-    #TODO: concurrent run of multiple container - podman-compose?
     podman run \
     --privileged --rm --tty --interactive --network=host \
     --annotation=iguana=True --env=iguana=True --env=NEWROOT=${NEWROOT} \
@@ -118,7 +122,7 @@ elif [ -n "$IGUANA_CONTAINERS" ]; then
   done
 # control.yaml is buildin control file in initrd
 elif [ -f "$IGUANA_BUILDIN_CONTROL" ]; then
-  /usb/bin/iguana-workflow $IGUANA_CMDLINE_EXTRA "$IGUANA_BUILDIN_CONTROL"
+  $IGUANA_WORKFLOW $IGUANA_CMDLINE_EXTRA "$IGUANA_BUILDIN_CONTROL"
 fi
 
 Echo "Containers run finished"
