@@ -8,17 +8,17 @@ fi
 
 IGUANA_WORKFLOW="/usr/bin/iguana-workflow"
 
-if [ ! -x $IGUANA_WORKFLOW ]; then
+if [ ! -x "$IGUANA_WORKFLOW" ]; then
   echo "Missing Iguana workflow binary!"
   exit 1
 fi
 
-NEWROOT=${NEWROOT:-/sysroot}
+NEWROOT="${NEWROOT:-/sysroot}"
 export NEWROOT
 
 # Directories for container data sharing and results
 mkdir -p /iguana
-mkdir -p $NEWROOT
+mkdir -p "$NEWROOT"
 
 # Open reporting fifo
 if [ -e /usr/bin/plymouth ] ; then
@@ -44,13 +44,13 @@ fi
 
 Echo "Preparing Iguana boot environment"
 
-# Clear preexisting machine id if present
+# Clear preexisting machine id if present and setup new so we have something
 rm -f /etc/machine-id
 rm -f /etc/hostname
 rm -f /var/lib/dbus/machine-id
-mkdir -p /var/lib/dbus
-dbus-uuidgen --ensure
 systemd-machine-id-setup
+
+cp /etc/machine-id /iguana/machine-id
 
 # make sure there are no pending changes in devices
 udevadm settle -t 60
@@ -90,7 +90,7 @@ EOF
 IGUANA_BUILDIN_CONTROL="/etc/iguana/control.yaml"
 IGUANA_CMDLINE_EXTRA="--newroot=${NEWROOT} ${IGUANA_DEBUG:+--debug --log-level=debug}"
 
-if [ -n $IGUANA_CONTROL_URL ]; then
+if [ -n "$IGUANA_CONTROL_URL" ]; then
   curl --insecure -o control_url.yaml -L -- "$IGUANA_CONTROL_URL"
   if [ $? -ne 0 ]; then
     Echo "Failed to download provided control file, ignoring"
@@ -138,7 +138,7 @@ fi
 # TODO: this is really naive
 # Scan $NEWROOT for installed kernel, initrd and command line
 # in case installed system has different kernel then the one we are running we need to kexec to new one
-if mount | grep -q ${NEWROOT}; then
+if mount | grep -q "$NEWROOT"; then
   CUR_KERNEL=$(uname -r)
   NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
   if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
