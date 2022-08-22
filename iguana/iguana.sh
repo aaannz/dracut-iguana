@@ -2,14 +2,20 @@
 
 [ -n "$IGUANA_DEBUG" ] && set -x
 
-if [ -z "$root" ] || [ "$root"x != "iguanabootx" ]; then
-  exit 0
+if [ "$root"x != "iguanabootx" ]; then
+  if [ -z "${IGUANA_CONTAINERS}${IGUANA_CONTROL_URL}" ]; then
+    # only boot iguana on existing root if we really intend to
+    echo "Root device is set, but iguana control not set explicitelly. Skipping Iguana."
+    exit 0
+  fi
+  EXISTING_ROOT=1
 fi
 
 IGUANA_WORKFLOW="/usr/bin/iguana-workflow"
 
 if [ ! -x "$IGUANA_WORKFLOW" ]; then
   echo "Missing Iguana workflow binary!"
+  sleep 10
   exit 1
 fi
 
@@ -44,12 +50,21 @@ fi
 
 Echo "Preparing Iguana boot environment"
 
-# Clear preexisting machine id if present and setup new so we have something
-rm -f /etc/machine-id
-rm -f /etc/hostname
-rm -f /var/lib/dbus/machine-id
-systemd-machine-id-setup
+if [ -n "$EXISTING_ROOT"] && mount "$EXISTING_ROOT" "$NEWROOT"; then
+  # We have already existing root, mount it and copy persistent data
+  cp "$NEWROOT/etc/machine-id" /etc/machine-id
+  # .. add anything to be machine stable here
+  umount "$NEWROOT"
+else
+  # Either empty root or cannot mount it.
+  # clear preexisting machine id from initrd build if present and setup new so we have something
+  rm -f /etc/machine-id
+  rm -f /etc/hostname
+  rm -f /var/lib/dbus/machine-id
+  systemd-machine-id-setup
+fi
 
+# Pass machine id to the containers through shared dir
 cp /etc/machine-id /iguana/machine-id
 
 # make sure there are no pending changes in devices
@@ -130,7 +145,10 @@ Echo "Containers run finished"
 # Mount new roots for upcoming switch_root
 if [ -f /iguana/newroot_device ]; then
   cat /iguana/newroot_device | while read device mountpoint; do
-    mount "$device" "$mountpoint"
+    mount "$device" "$mountpoint" || Echo "Failed to mount ${device} as ${mountpoint}"
+    if [ "$mountpoint" -eq "$NEWROOT" ]; then
+      root=$device
+    fi
   done
 fi
 
@@ -142,13 +160,13 @@ if mount | grep -q "$NEWROOT"; then
   CUR_KERNEL=$(uname -r)
   NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
   if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
-    # different kernel detected - try kexec to new one
+    Echo "Initrd kernel '${CUR_KERNEL}' is different from installed kernel '${NEW_KERNEL}'. Trying kexec"
     kexec -l "${NEWROOT}/boot/vmlinuz" --initrd="${NEWROOT}/boot/initrd" --reuse-cmdline
     umount -a
     sync
     kexec -e
-    Echo "Kexec failed, rebooting with correct kernel version in 10s"
-    sleep 10
+    Echo "Kexec failed, rebooting with correct kernel version in 5s"
+    sleep 5
     reboot -f
   fi
 else
