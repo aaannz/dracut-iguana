@@ -119,22 +119,21 @@ elif [ -n "$IGUANA_CONTAINERS" ]; then
   Echo "Using container list from kcmdline: ${IGUANA_CONTAINERS}"
   readarray -d , -t container_array <<< "$IGUANA_CONTAINERS"
 
-  # once iguana-workflow is stable, replace this by workflow writer and workflow run
+  cat > /control_containers.yaml << EOH
+name: Dynamic containers yaml
+
+jobs:
+EOH
+  N=0
   for c in "${container_array}"; do
-    #TODO: remove tls-verify-false and instead pull correct CA
-    podman image pull --tls-verify=false -- $c > /iguana/progress
-
-    #TODO: image validation, cosign
-    #TODO: load result volume based on the info from control.yaml
-    podman run \
-    --privileged --rm --tty --interactive --network=host \
-    --annotation=iguana=True --env=iguana=True --env=NEWROOT=${NEWROOT} \
-    --volume="/dev:/dev" \
-    --mount=type=bind,source=/iguana,target=/iguana \
-    -- $c
-
-    [ -z "$IGUANA_DEBUG" ] && podman image rm -- $c
+    cat >> /control_containers.yaml << EOF
+  job${N}:
+    container:
+      image: ${c}
+EOF
+  let N=$N+1
   done
+  $IGUANA_WORKFLOW $IGUANA_CMDLINE_EXTRA /control_containers.yaml
 # control.yaml is buildin control file in initrd
 elif [ -f "$IGUANA_BUILDIN_CONTROL" ]; then
   $IGUANA_WORKFLOW $IGUANA_CMDLINE_EXTRA "$IGUANA_BUILDIN_CONTROL"
