@@ -142,10 +142,10 @@ fi
 Echo "Containers run finished"
 
 # Mount new roots for upcoming switch_root
-if [ -f /iguana/newroot_device ]; then
-  cat /iguana/newroot_device | while read device mountpoint; do
+if [ -f /iguana/mountlist ]; then
+  cat /iguana/mountlist | while read device mountpoint; do
     mount "$device" "$mountpoint" || Echo "Failed to mount ${device} as ${mountpoint}"
-    if [ "$mountpoint" -eq "$NEWROOT" ]; then
+    if [ "$mountpoint" == "$NEWROOT" ]; then
       root=$device
     fi
   done
@@ -156,7 +156,7 @@ fi
 # Scan $NEWROOT for installed kernel, initrd and command line
 # in case installed system has different kernel then the one we are running we need to kexec to new one
 if mount | grep -q "$NEWROOT"; then
-  CUR_KERNEL=$(uname -r)
+  CUR_KERNEL=$(cat /proc/version | sed -n -e 's/^Linux version \([^ ]*\) .*$/\1/p')
   NEW_KERNEL=$(ls ${NEWROOT}/lib/modules/)
   if [ "$CUR_KERNEL" != "$NEW_KERNEL" ]; then
     Echo "Initrd kernel '${CUR_KERNEL}' is different from installed kernel '${NEW_KERNEL}'. Trying kexec"
