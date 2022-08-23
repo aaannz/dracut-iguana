@@ -1,7 +1,9 @@
 # dracut-iguana
 ## dracut module to include container runtime in initrd
 
-Part of Iguana installer research project. Use at your own risk.
+_part of [Iguana installer research project](https://github.com/aaannz/iguana)._
+
+Unstable software, use at your own risk.
 
 ## How to test
 
@@ -12,4 +14,29 @@ Part of Iguana installer research project. Use at your own risk.
   This will generate `iguana-initrd` file in your current directory.
 
 4) Use new VM and boot directly to kernel and `iguana-initrd` created in previous steps.
-5) To test with dinstaller, use `rd.iguana.containers=registry.opensuse.org/yast/head/containers/containers_tumbleweed/opensuse/dinstaller-all:latest rd.iguana.debug=1` as kernel command line
+5) To test with dinstaller, use `rd.iguana.control_url=https://raw.githubusercontent.com/aaannz/iguana-workflow/main/examples/d-installer.yaml rd.iguana.debug=1` as kernel command line
+
+### Submit to OBS
+
+[osc](https://openbuildservice.org/help/manuals/obs-user-guide/art.obs.bg.html#sec.obsbg.req) tool is required for submitting to the [OBS project](https://build.opensuse.org/package/show/home:oholecek/iguana-workflow)
+
+1) checkout package to your project space
+
+    `osc bco home:oholecek dracut-iguana`
+
+2) from withing checked out project update cargo services
+
+    `osc service ra`
+
+2) remove old source tarballs
+3) add new and remove old files
+
+    `osc ar`
+
+4) submit changes to your package
+
+    `osc ci`
+
+5) after tests create submit request
+
+    `osc sr home:oholecek dracut-iguana`
