@@ -151,6 +151,15 @@ if [ -f /iguana/mountlist ]; then
   done
 fi
 
+[ -f /iguana/kernelAction ] && KERNEL_ACTION=$(cat /iguana/kernelAction)
+
+if [ "$KERNEL_ACTION" == "kexec" ]; then
+  umount -a
+  sync
+  kexec -e
+  Echo "Preloaded kexec failed!"
+fi
+
 # TODO: add proper kernel action parsing
 # TODO: this is really naive
 # Scan $NEWROOT for installed kernel, initrd and command line
