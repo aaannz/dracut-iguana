@@ -1,4 +1,6 @@
-# dracut-iguana
+# This repository was merged into [Iguana](https://github.com/openSUSE/iguana) and obsoleted.
+
+## dracut-iguana
 ## dracut module to include container runtime in initrd
 
 _part of [Iguana installer research project](https://github.com/aaannz/iguana)._
